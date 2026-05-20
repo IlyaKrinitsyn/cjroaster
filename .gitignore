@@ -5,7 +5,7 @@ venv/
 .env
 
 # Папка с историей прожарок (может быть большой)
-references/history/
+references/
 
 # Кэш Python
 __pycache__/
