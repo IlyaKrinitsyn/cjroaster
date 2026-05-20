@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Прожарка CJM</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --sber-green: #21A038;
+            --sber-green-dark: #1A8A2E;
+            --sber-gray-bg: #F2F5F9;
+        }
+        body { background-color: var(--sber-gray-bg); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .header { background: linear-gradient(135deg, var(--sber-green) 0%, #34C759 100%); padding: 1.5rem; border-radius: 0 0 20px 20px; margin-bottom: 2rem; color: white; }
+        .card { border: none; border-radius: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+        .btn-primary { background: linear-gradient(135deg, var(--sber-green) 0%, var(--sber-green-dark) 100%); border: none; border-radius: 16px; padding: 10px 24px; font-weight: 600; }
+        .btn-primary:hover { background: linear-gradient(135deg, #2DB84D 0%, #239D3C 100%); transform: translateY(-1px); box-shadow: 0 8px 22px rgba(33,160,56,0.35); }
+        .step-item { border: 1px solid #E0E8F0; border-radius: 16px; padding: 1rem; margin-bottom: 1rem; background: white; }
+        .result-card { border-left: 4px solid var(--sber-green); border-radius: 12px; padding: 1rem; margin-bottom: 1rem; background: white; }
+        .nav-tabs .nav-link { border-radius: 12px 12px 0 0; color: #666; }
+        .nav-tabs .nav-link.active { color: var(--sber-green); font-weight: 600; }
+        .reference-img { width: 100%; border-radius: 12px; margin-bottom: 5px; }
+        .tree-item { margin-left: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header text-center">
+        <h1>🔥 Прожарка клиентского пути</h1>
+        <p class="mb-0">Загрузите скриншоты или вставьте ссылку на Figma</p>
+    </div>
+
+    <div class="container">
+        <div class="row">
+            <div class="col-md-10 mx-auto">
+                <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="roast-tab" data-bs-toggle="tab" data-bs-target="#roast" type="button" role="tab">🔍 Прожарка</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab">📚 История</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab">📊 Дашборд</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="kb-tab" data-bs-toggle="tab" data-bs-target="#kb" type="button" role="tab">🗂️ База прожарок</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content">
+                    <!-- Прожарка -->
+                    <div class="tab-pane fade show active" id="roast" role="tabpanel">
+                        <div class="card p-4 mb-4">
+                            <h5 class="mb-3">Параметры клиентского пути</h5>
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Банк / Приложение</label>
+                                    <select class="form-select" id="bank"><option value="">Выберите или введите новое</option></select>
+                                    <input type="text" class="form-control mt-1 d-none" id="bankNew" placeholder="Название нового банка">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Продукт *</label>
+                                    <select class="form-select" id="productSelect"><option value="">Выберите или введите новый</option></select>
+                                    <input type="text" class="form-control mt-1 d-none" id="productNew" placeholder="Название нового продукта">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Цель клиентского пути *</label>
+                                    <input type="text" class="form-control" id="goal" placeholder="Например, Оформление кредитной карты">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Тип пути *</label>
+                                    <select class="form-select" id="pathType">
+                                        <option value="Конверсионный">Конверсионный</option>
+                                        <option value="Информирующий">Информирующий</option>
+                                        <option value="Сервисный">Сервисный</option>
+                                        <option value="Удерживающий">Удерживающий</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <label class="form-label">Критерий успешного завершения *</label>
+                                <input type="text" class="form-control" id="criteria" placeholder="Например, Заявка отправлена, клиент получил решение">
+                            </div>
+                            <hr>
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-8">
+                                    <label class="form-label">🔗 Ссылка на Figma-файл (если есть)</label>
+                                    <input type="text" class="form-control" id="figmaLink" placeholder="https://www.figma.com/design/...">
+                                    <div id="figmaStatus" class="form-text"></div>
+                                </div>
+                                <div class="col-md-4" id="pageSelectContainer" style="display:none;">
+                                    <label class="form-label">Страница *</label>
+                                    <select class="form-select" id="pageSelect"><option value="">-- выберите --</option></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Блок с ручной загрузкой экранов (показывается, если нет Figma-ссылки) -->
+                        <div id="manualUploadSection">
+                            <div class="card p-4 mb-4">
+                                <h5 class="mb-3">🖼️ Экраны клиентского пути</h5>
+                                <div id="stepsContainer">
+                                    <div class="step-item">
+                                        <label class="form-label">Шаг 1</label>
+                                        <input type="file" class="form-control step-file" accept="image/png, image/jpeg, image/jpg">
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary mt-2" id="addStepBtn">➕ Добавить шаг</button>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-primary w-100 mb-4" id="analyzeBtn">🚀 Запустить прожарку</button>
+                        <div id="loading" class="text-center d-none"><div class="spinner-border text-success"></div><p class="mt-2">Проводим прожарку...</p></div>
+                        <div id="results"></div>
+                    </div>
+
+                    <!-- История -->
+                    <div class="tab-pane fade" id="history" role="tabpanel">
+                        <div class="card p-4">
+                            <h5 class="mb-3">📚 История прожарок</h5>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4"><select class="form-select" id="historyBankFilter"><option value="">Все банки</option></select></div>
+                                <div class="col-md-4"><select class="form-select" id="historyProductFilter"><option value="">Все продукты</option></select></div>
+                                <div class="col-md-4"><select class="form-select" id="historyGuideFilter"><option value="">Все гайды</option></select></div>
+                            </div>
+                            <div id="historyList"></div>
+                        </div>
+                    </div>
+
+                    <!-- Дашборд -->
+                    <div class="tab-pane fade" id="dashboard" role="tabpanel">
+                        <div class="card p-4">
+                            <h5 class="mb-3">📊 Дашборд «Здоровье CJM»</h5>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4"><select class="form-select" id="dashProduct"><option value="">Все продукты</option></select></div>
+                                <div class="col-md-4"><select class="form-select" id="dashGuide"><option value="">Все гайды</option></select></div>
+                                <div class="col-md-4"><input type="number" class="form-control" id="dashDays" value="90" min="7" max="365"></div>
+                            </div>
+                            <div id="dashboardContent"></div>
+                        </div>
+                    </div>
+
+                    <!-- База прожарок -->
+                    <div class="tab-pane fade" id="kb" role="tabpanel">
+                        <div class="card p-4">
+                            <h5 class="mb-3">🗂️ База прожарок</h5>
+                            <div id="kbContent">Загрузка...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let stepCount = 1;
+        const MAX_STEPS = 10;
+        const PATH_TYPE_TO_GUIDE = {
+            "Конверсионный": "Conversion.txt",
+            "Информирующий": "Informing.txt",
+            "Сервисный": "Service.txt",
+            "Удерживающий": "Retention.txt",
+        };
+
+        function extractFileKey(url) {
+            const match = url.match(/figma\.com\/(file|design)\/([a-zA-Z0-9]+)/);
+            return match ? match[2] : null;
+        }
+
+        // Загрузка банков и продуктов при старте
+        async function loadBanksAndProducts() {
+            const [banks, products] = await Promise.all([
+                fetch('/banks').then(r => r.json()),
+                fetch('/products').then(r => r.json())
+            ]);
+            const bankSelect = document.getElementById('bank');
+            const productSelect = document.getElementById('productSelect');
+            banks.forEach(b => bankSelect.innerHTML += `<option value="${b}">${b}</option>`);
+            products.forEach(p => productSelect.innerHTML += `<option value="${p}">${p}</option>`);
+            bankSelect.innerHTML += '<option value="__new__">➕ Добавить новый</option>';
+            productSelect.innerHTML += '<option value="__new__">➕ Добавить новый</option>';
+            bankSelect.addEventListener('change', function() {
+                if (this.value === '__new__') {
+                    document.getElementById('bankNew').classList.remove('d-none');
+                    this.value = '';
+                }
+            });
+            productSelect.addEventListener('change', function() {
+                if (this.value === '__new__') {
+                    document.getElementById('productNew').classList.remove('d-none');
+                    this.value = '';
+                }
+            });
+        }
+
+        // Работа с Figma-ссылкой: загрузка страниц
+        const figmaLinkInput = document.getElementById('figmaLink');
+        const pageSelect = document.getElementById('pageSelect');
+        const pageSelectContainer = document.getElementById('pageSelectContainer');
+        const figmaStatus = document.getElementById('figmaStatus');
+        const manualUploadSection = document.getElementById('manualUploadSection');
+
+        async function loadFigmaPages() {
+            const url = figmaLinkInput.value.trim();
+            if (!url) {
+                pageSelectContainer.style.display = 'none';
+                pageSelect.innerHTML = '<option value="">-- выберите --</option>';
+                figmaStatus.textContent = '';
+                manualUploadSection.style.display = 'block';
+                return;
+            }
+            const fileKey = extractFileKey(url);
+            if (!fileKey) {
+                figmaStatus.textContent = 'Не удалось извлечь ключ файла из ссылки';
+                pageSelectContainer.style.display = 'none';
+                pageSelect.innerHTML = '<option value="">-- выберите --</option>';
+                manualUploadSection.style.display = 'block';
+                return;
+            }
+            figmaStatus.textContent = 'Загрузка страниц...';
+            try {
+                const resp = await fetch(`/figma/pages?file_key=${fileKey}`);
+                const data = await resp.json();
+                if (data.error) {
+                    figmaStatus.textContent = 'Ошибка: ' + data.error;
+                    pageSelectContainer.style.display = 'none';
+                    pageSelect.innerHTML = '<option value="">-- выберите --</option>';
+                    manualUploadSection.style.display = 'block';
+                } else {
+                    pageSelect.innerHTML = '<option value="">-- выберите --</option>';
+                    data.pages.forEach((page, index) => {
+                        const option = document.createElement('option');
+                        option.value = index + 1;
+                        option.textContent = page.name + (page.frame_count ? ` (${page.frame_count} фреймов)` : '');
+                        pageSelect.appendChild(option);
+                    });
+                    pageSelectContainer.style.display = 'block';
+                    manualUploadSection.style.display = 'none';
+                    figmaStatus.textContent = `Найдено страниц: ${data.pages.length}`;
+                }
+            } catch (err) {
+                figmaStatus.textContent = 'Ошибка сети при загрузке страниц';
+                pageSelectContainer.style.display = 'none';
+                pageSelect.innerHTML = '<option value="">-- выберите --</option>';
+                manualUploadSection.style.display = 'block';
+            }
+        }
+
+        figmaLinkInput.addEventListener('blur', loadFigmaPages);
+        figmaLinkInput.addEventListener('input', function() {
+            if (!this.value.trim()) {
+                pageSelectContainer.style.display = 'none';
+                pageSelect.innerHTML = '<option value="">-- выберите --</option>';
+                figmaStatus.textContent = '';
+                manualUploadSection.style.display = 'block';
+            }
+        });
+
+        // Кнопка добавления шага
+        document.getElementById('addStepBtn').addEventListener('click', () => {
+            if (stepCount < MAX_STEPS) {
+                stepCount++;
+                const div = document.createElement('div');
+                div.className = 'step-item';
+                div.innerHTML = `<label class="form-label">Шаг ${stepCount}</label>
+                                 <input type="file" class="form-control step-file" accept="image/png, image/jpeg, image/jpg">`;
+                document.getElementById('stepsContainer').appendChild(div);
+            }
+        });
+
+        // Запуск прожарки
+        document.getElementById('analyzeBtn').addEventListener('click', async () => {
+            const bank = document.getElementById('bank').value || document.getElementById('bankNew').value.trim();
+            const product = document.getElementById('productSelect').value || document.getElementById('productNew').value.trim();
+            const goal = document.getElementById('goal').value.trim();
+            const criteria = document.getElementById('criteria').value.trim();
+            const pathType = document.getElementById('pathType').value;
+            const guide = PATH_TYPE_TO_GUIDE[pathType];
+
+            if (!product || !goal || !criteria) { alert('Заполните все обязательные поля'); return; }
+
+            const figmaUrl = figmaLinkInput.value.trim();
+            const pageIndex = pageSelect.value;
+
+            if (figmaUrl && !pageIndex) {
+                alert('Выберите страницу из выпадающего списка (или дождитесь загрузки страниц)');
+                return;
+            }
+
+            document.getElementById('loading').classList.remove('d-none');
+            document.getElementById('results').innerHTML = '';
+
+            try {
+                let data;
+                if (figmaUrl && pageIndex) {
+                    const fileKey = extractFileKey(figmaUrl);
+                    if (!fileKey) {
+                        alert('Не удалось извлечь ключ файла из ссылки');
+                        document.getElementById('loading').classList.add('d-none');
+                        return;
+                    }
+                    const formData = new FormData();
+                    formData.append('file_key', fileKey);
+                    formData.append('page_index', pageIndex);
+                    formData.append('product', product);
+                    formData.append('goal', goal);
+                    formData.append('criteria', criteria);
+                    formData.append('guide', guide);
+                    if (bank) formData.append('bank', bank);
+                    const resp = await fetch('/figma/analyze', { method: 'POST', body: formData });
+                    data = await resp.json();
+                } else {
+                    // Обычный режим с файлами
+                    const fileInputs = document.querySelectorAll('.step-file');
+                    const files = [];
+                    fileInputs.forEach(input => { if (input.files.length > 0) files.push(input.files[0]); });
+                    if (files.length === 0) { alert('Загрузите хотя бы один скриншот'); document.getElementById('loading').classList.add('d-none'); return; }
+
+                    const formData = new FormData();
+                    formData.append('bank', bank);
+                    formData.append('product', product);
+                    formData.append('goal', goal);
+                    formData.append('criteria', criteria);
+                    formData.append('guide', guide);
+                    files.forEach(f => formData.append('files', f));
+                    const resp = await fetch('/analyze', { method: 'POST', body: formData });
+                    data = await resp.json();
+                }
+
+                document.getElementById('loading').classList.add('d-none');
+                displayResults(data);
+            } catch (err) {
+                document.getElementById('loading').classList.add('d-none');
+                document.getElementById('results').innerHTML = `<div class="alert alert-danger">Ошибка: ${err.message}</div>`;
+            }
+        });
+
+        function displayResults(data) {
+            let html = '<h4 class="mt-4">📝 Описание макета</h4>';
+            html += `<div class="card p-3 mb-3"><pre style="white-space: pre-wrap;">${(data.description || '').substring(0, 20000)}</pre></div>`;
+            html += '<h4>📊 Результат прожарки</h4>';
+            if (data.report_items && data.report_items.length > 0) {
+                data.report_items.forEach(item => {
+                    const status = item.статус === 'выполнено' ? '✅' : '❌';
+                    html += `<div class="result-card"><strong>${status} ${item.критерий}</strong>`;
+                    if (item.статус !== 'выполнено') {
+                        html += `<br><strong>Проблема:</strong> ${item.проблема || '-'}`;
+                        html += `<br><strong>Рекомендация:</strong> ${item.рекомендация || '-'}`;
+                        html += `<br><strong>Критичность:</strong> <span class="badge bg-danger">${item.критичность || '-'}</span>`;
+                        html += `<br><button class="btn btn-sm btn-outline-secondary mt-2 load-refs-btn" data-query="${item.проблема}">🔍 Найти примеры</button>`;
+                        html += `<div class="refs-container mt-2"></div>`;
+                    }
+                    html += '</div>';
+                });
+            } else {
+                html += '<p>Нет данных для отображения</p>';
+            }
+            if (data.hypotheses && data.hypotheses.length > 0) {
+                html += '<h4 class="mt-4">🧪 A/B-гипотезы</h4>';
+                data.hypotheses.forEach(h => {
+                    html += `<div class="card p-3 mb-2" style="border-left: 4px solid #21A038;">
+                                <strong>${h.критерий || '?'}</strong><br>
+                                ${h.гипотеза || '?'}
+                             </div>`;
+                });
+            }
+            document.getElementById('results').innerHTML = html;
+            document.querySelectorAll('.load-refs-btn').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const query = this.getAttribute('data-query');
+                    const container = this.nextElementSibling;
+                    container.innerHTML = '<div class="spinner-border spinner-border-sm text-success"></div>';
+                    try {
+                        const resp = await fetch(`/references?query=${encodeURIComponent(query)}&limit=3`);
+                        const refs = await resp.json();
+                        if (refs.length > 0) {
+                            let refHtml = '<div class="row mt-2">';
+                            refs.forEach(ref => {
+                                refHtml += `<div class="col-md-4"><div class="card p-2">`;
+                                if (ref.source === 'local' || ref.source === 'history') {
+                                    refHtml += `<img src="${ref.image_path}" class="reference-img" alt="${ref.app_name}" onerror="this.src='https://via.placeholder.com/150'">`;
+                                } else {
+                                    refHtml += `<img src="${ref.image_url}" class="reference-img" alt="${ref.app_name}">`;
+                                    if (ref.mobbin_url) refHtml += `<a href="${ref.mobbin_url}" target="_blank" class="small">Открыть в Mobbin</a>`;
+                                }
+                                refHtml += `<small>${ref.app_name}</small></div></div>`;
+                            });
+                            refHtml += '</div>';
+                            container.innerHTML = refHtml;
+                        } else {
+                            container.innerHTML = '<small class="text-muted">Примеры не найдены</small>';
+                        }
+                    } catch (e) {
+                        container.innerHTML = '<small class="text-danger">Ошибка загрузки</small>';
+                    }
+                });
+            });
+        }
+
+        // История (с фильтрами)
+        async function loadHistory() {
+            const bank = document.getElementById('historyBankFilter').value;
+            const product = document.getElementById('historyProductFilter').value;
+            const guide = document.getElementById('historyGuideFilter').value;
+            let url = '/history?limit=50';
+            if (bank) url += '&bank=' + encodeURIComponent(bank);
+            if (product) url += '&product=' + encodeURIComponent(product);
+            if (guide) url += '&guide=' + encodeURIComponent(guide);
+            const resp = await fetch(url);
+            const reports = await resp.json();
+            let html = '';
+            reports.forEach(rep => {
+                html += `<div class="card p-3 mb-2">
+                            <strong>${rep.timestamp?.substring(0, 19)}</strong> | ${rep.bank || ''} | ${rep.product_name || '?'}
+                            <br><small>${(rep.description || '').substring(0, 100)}…</small>
+                         </div>`;
+            });
+            document.getElementById('historyList').innerHTML = html || '<p>Нет сохранённых отчётов</p>';
+        }
+        document.getElementById('historyBankFilter').addEventListener('change', loadHistory);
+        document.getElementById('historyProductFilter').addEventListener('change', loadHistory);
+        document.getElementById('historyGuideFilter').addEventListener('change', loadHistory);
+
+        // Дашборд
+        async function loadDashboard() {
+            const product = document.getElementById('dashProduct').value;
+            const guide = document.getElementById('dashGuide').value;
+            const days = document.getElementById('dashDays').value;
+            const url = `/dashboard?product=${encodeURIComponent(product)}&guide=${encodeURIComponent(guide)}&days=${days}`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+            let html = '';
+            if (data.heatmap && data.heatmap.products.length > 0) {
+                html += '<h6>🗺️ Тепловая карта</h6><div class="table-responsive"><table class="table table-bordered table-sm"><thead><tr><th>Критерий</th>';
+                data.heatmap.products.forEach(p => html += `<th>${p}</th>`);
+                html += '</tr></thead><tbody>';
+                data.heatmap.criteria.forEach(c => {
+                    html += `<tr><td>${c}</td>`;
+                    data.heatmap.products.forEach(p => {
+                        const score = data.heatmap.scores[p]?.[c];
+                        let color = '#f0f0f0';
+                        if (score !== null) {
+                            if (score >= 1.8) color = '#c8e6c9';
+                            else if (score >= 1.0) color = '#fff9c4';
+                            else color = '#ffcdd2';
+                        }
+                        html += `<td style="background:${color};text-align:center;">${score?.toFixed(1) || '-'}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div>';
+            } else html += '<p>Нет данных</p>';
+            if (data.trend && data.trend.length) {
+                html += '<h6 class="mt-4">📈 Было / Стало</h6>';
+                data.trend.forEach(p => html += `<p>${p.product} — ${p.image}: ${p.timestamp} — ${p.avg_score}</p>`);
+            }
+            if (data.crit_dist && Object.keys(data.crit_dist).length) {
+                html += '<h6 class="mt-4">⚠️ Критичность</h6>';
+                for (const [k, v] of Object.entries(data.crit_dist)) html += `<p>${k}: ${v}</p>`;
+            }
+            document.getElementById('dashboardContent').innerHTML = html;
+        }
+        document.getElementById('dashProduct').addEventListener('change', loadDashboard);
+        document.getElementById('dashGuide').addEventListener('change', loadDashboard);
+        document.getElementById('dashDays').addEventListener('change', loadDashboard);
+
+        // База прожарок (дерево)
+        async function loadKnowledgeBase() {
+            const resp = await fetch('/knowledge_base');
+            const tree = await resp.json();
+            let html = '';
+            for (const bank in tree) {
+                html += `<h6>🏦 ${bank}</h6>`;
+                for (const product in tree[bank]) {
+                    html += `<div class="tree-item"><strong>📦 ${product}</strong>`;
+                    for (const scenario in tree[bank][product]) {
+                        html += `<div class="tree-item">📋 ${scenario}`;
+                        tree[bank][product][scenario].forEach(v => {
+                            html += `<div class="tree-item"><small>${v.timestamp?.substring(0,19)} — ${v.guide}</small></div>`;
+                        });
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                }
+            }
+            document.getElementById('kbContent').innerHTML = html || '<p>Пока нет данных</p>';
+        }
+        document.getElementById('kb-tab').addEventListener('shown.bs.tab', loadKnowledgeBase);
+
+        // Заполнение фильтров
+        async function loadFilters() {
+            const [banks, products] = await Promise.all([
+                fetch('/banks').then(r => r.json()),
+                fetch('/products').then(r => r.json())
+            ]);
+            ['historyBankFilter'].forEach(id => {
+                const sel = document.getElementById(id);
+                banks.forEach(b => sel.innerHTML += `<option value="${b}">${b}</option>`);
+            });
+            ['historyProductFilter', 'dashProduct'].forEach(id => {
+                const sel = document.getElementById(id);
+                products.forEach(p => sel.innerHTML += `<option value="${p}">${p}</option>`);
+            });
+        }
+
+        loadBanksAndProducts();
+        loadFilters();
+        loadHistory();
+        loadDashboard();
+    </script>
+</body>
+</html>

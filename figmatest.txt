@@ -1,0 +1,7 @@
+curl -X POST http://localhost:8000/figma/analyze \
+  -F "file_key=wXLdwcIp4C3ceQT5xR7wfo" \
+  -F "page_index=2" \
+  -F "product=Профиль" \
+  -F "goal=Просмотр пакетов и подписок" \
+  -F "criteria=Клиент узнал какие подписки подключены" \
+  -F "guide=Informing.txt"
