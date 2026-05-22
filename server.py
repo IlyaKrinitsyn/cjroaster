@@ -3,12 +3,16 @@ import sys
 import json
 import base64
 import re
+import asyncio
+import secrets
 import requests
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 from config import (
     MODEL_NAME, PROMPTS_DIR, GUIDES_DIR, REFERENCES_DIR, DESCRIPTION_MAX_TOKENS, ROAST_MAX_TOKENS,
@@ -18,7 +22,7 @@ from config import (
 from openai import OpenAI
 from database import (
     init_db, save_report, load_reports, get_products, get_guide_names,
-    get_banks, find_best_for_criterion, get_knowledge_base
+    get_banks, find_best_for_criterion, get_knowledge_base, validate_api_key
 )
 from dashboard import (
     get_reports_for_dashboard, compute_heatmap_data, compute_trend_data, compute_criticality_distribution
@@ -35,6 +39,57 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 client = OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio", timeout=API_TIMEOUT)
 init_db()
 
+security = HTTPBearer()
+
+# ---------- Очередь задач ----------
+task_queue = asyncio.Queue()
+task_results: dict[str, dict] = {}
+AVERAGE_TASK_TIME = 30  # секунд — примерное время выполнения одной прожарки
+
+def verify_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    key_info = validate_api_key(token)
+    if key_info is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or revoked API key")
+    return key_info
+
+async def task_worker():
+    while True:
+        task_id, params, _ = await task_queue.get()
+        task_results[task_id]["status"] = "processing"
+        try:
+            if params.get("type") == "figma":
+                result = await analyze_from_figma(
+                    file_key=params["figma_file_key"],
+                    page_index=str(params.get("figma_page_index", 1)),
+                    product=params["product"],
+                    goal=params["goal"],
+                    criteria=params["criteria"],
+                    guide=params["guide"],
+                    bank=params.get("bank", "")
+                )
+            else:
+                files = params["files"]
+                result = await analyze(
+                    product=params["product"],
+                    goal=params["goal"],
+                    criteria=params["criteria"],
+                    guide=params["guide"],
+                    bank=params.get("bank", ""),
+                    files=files
+                )
+            task_results[task_id]["result"] = result
+            task_results[task_id]["status"] = "done"
+        except Exception as e:
+            task_results[task_id]["status"] = "error"
+            task_results[task_id]["error"] = str(e)
+        finally:
+            task_queue.task_done()
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(task_worker())
+
 # ---------- Вспомогательные функции ----------
 def load_text(path):
     if not os.path.exists(path):
@@ -49,14 +104,9 @@ system_hypothesis = load_text(os.path.join(PROMPTS_DIR, "system_hypothesis.txt")
 user_hypothesis_template = load_text(os.path.join(PROMPTS_DIR, "user_hypothesis.txt"))
 
 def parse_llm_json(text):
-    """Умный парсер JSON, исправляющий типичные ошибки модели."""
     if not text:
         return None
-
-    # Убираем markdown-блоки
     text = re.sub(r'```(?:json)?\s*', '', text, flags=re.IGNORECASE)
-
-    # Попытка 1: найти и загрузить JSON напрямую
     start = text.find('[')
     end = text.rfind(']')
     if start != -1 and end != -1 and end > start:
@@ -64,8 +114,6 @@ def parse_llm_json(text):
             return json.loads(text[start:end+1])
         except json.JSONDecodeError:
             pass
-
-    # Попытка 2: исправить пропущенные запятые между объектами
     fixed = re.sub(r'\}\s*\{', '}, {', text)
     start = fixed.find('[')
     end = fixed.rfind(']')
@@ -74,38 +122,14 @@ def parse_llm_json(text):
             return json.loads(fixed[start:end+1])
         except json.JSONDecodeError:
             pass
-
-    # Попытка 3: если ответ обрезан — добавляем закрывающую скобку
+    start = text.find('[')
+    end = text.rfind(']')
     if start != -1 and end == -1:
         fixed = text[start:] + ']'
         try:
             return json.loads(fixed)
         except json.JSONDecodeError:
             pass
-
-    # Попытка 4: найти и восстановить объекты с повреждёнными ключами
-    # (например, когда вместо "критерий" стоит " আক্রম" или "term")
-    start = text.find('[')
-    end = text.rfind(']')
-    if start != -1 and end != -1 and end > start:
-        raw = text[start:end+1]
-        # Убираем лишние символы, которые ломают JSON
-        raw = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f-\x9f]', '', raw)
-        try:
-            items = json.loads(raw)
-            if isinstance(items, list):
-                # Проверяем каждый объект: если нет ключа "критерий", заменяем первый неизвестный ключ
-                for item in items:
-                    if isinstance(item, dict) and "критерий" not in item:
-                        for key in list(item.keys()):
-                            if key not in ["оценка", "статус", "проблема", "рекомендация", "критичность"]:
-                                item["критерий"] = item.pop(key)
-                                break
-                return items
-        except json.JSONDecodeError:
-            pass
-
-    # Попытка 5: найти объект, а не массив
     start = text.find('{')
     end = text.rfind('}')
     if start != -1 and end != -1 and end > start:
@@ -113,7 +137,6 @@ def parse_llm_json(text):
             return json.loads(text[start:end+1])
         except json.JSONDecodeError:
             pass
-
     return None
 
 def analyze_image(image_data):
@@ -221,7 +244,22 @@ def save_version_files(bank, product, scenario, files, version_id):
 
     return version_dir, step_files, bank_slug, product_slug, scenario_slug
 
-# ---------- API-эндпоинты ----------
+class FakeUploadFile:
+    def __init__(self, path):
+        self.filename = os.path.basename(path)
+        self.file = open(path, "rb")
+    async def read(self):
+        return self.file.read()
+
+class FakeUploadFileFromBytes:
+    def __init__(self, data: bytes, filename: str):
+        self.filename = filename
+        self.data = data
+        self.file = None
+    async def read(self):
+        return self.data
+
+# ---------- Локальные эндпоинты (веб-интерфейс) ----------
 @app.get("/")
 async def serve_frontend():
     frontend_path = Path(__file__).parent / "index.html"
@@ -456,7 +494,6 @@ def search_all_references(query: str, limit: int = 3):
     mobbin_results = search_mobbin_references(query, remaining) if remaining > 0 else []
     return (local_results + mobbin_results)[:limit]
 
-# ---------- ИНТЕГРАЦИЯ С FIGMA ----------
 @app.get("/figma/pages")
 async def get_figma_pages(file_key: str):
     if not FIGMA_ACCESS_TOKEN:
@@ -570,13 +607,6 @@ async def analyze_from_figma(
 
     print(f"Скриншот страницы '{target_canvas.get('name', '')}' сохранён: {filepath}")
 
-    class FakeUploadFile:
-        def __init__(self, path):
-            self.filename = os.path.basename(path)
-            self.file = open(path, "rb")
-        async def read(self):
-            return self.file.read()
-
     fake_files = [FakeUploadFile(filepath)]
     try:
         result = await analyze(
@@ -591,3 +621,87 @@ async def analyze_from_figma(
     finally:
         for f in fake_files:
             f.file.close()
+
+# ---------- API-эндпоинты (внешние вызовы) ----------
+@app.post("/api/v1/roast")
+async def api_roast(
+    key_info: dict = Depends(verify_api_key),
+    file: UploadFile | None = File(None),
+    file_base64: str | None = Form(None),
+    file_url: str | None = Form(None),
+    figma_file_key: str | None = Form(None),
+    figma_page_index: int | None = Form(None),
+    product: str = Form(...),
+    goal: str = Form(...),
+    criteria: str = Form(...),
+    guide: str = Form(...),
+    bank: str = Form("")
+):
+    task_id = secrets.token_hex(8)
+    position = task_queue.qsize()
+    estimated_wait = position * AVERAGE_TASK_TIME
+
+    if figma_file_key:
+        params = {
+            "type": "figma",
+            "figma_file_key": figma_file_key,
+            "figma_page_index": figma_page_index or 1,
+            "product": product,
+            "goal": goal,
+            "criteria": criteria,
+            "guide": guide,
+            "bank": bank
+        }
+    else:
+        if file is not None and file.filename:
+            image_data = await file.read()
+            files = [FakeUploadFileFromBytes(image_data, file.filename)]
+        elif file_base64:
+            try:
+                image_data = base64.b64decode(file_base64)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid base64 data")
+            files = [FakeUploadFileFromBytes(image_data, "screenshot.png")]
+        elif file_url:
+            try:
+                resp = requests.get(file_url, timeout=30)
+                resp.raise_for_status()
+                image_data = resp.content
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to download image: {e}")
+            files = [FakeUploadFileFromBytes(image_data, "screenshot.png")]
+        else:
+            raise HTTPException(status_code=400, detail="No file, file_base64, file_url, or figma_file_key provided")
+        params = {
+            "type": "file",
+            "files": files,
+            "product": product,
+            "goal": goal,
+            "criteria": criteria,
+            "guide": guide,
+            "bank": bank
+        }
+
+    task_results[task_id] = {"status": "queued", "position": position}
+    await task_queue.put((task_id, params, None))
+
+    return {
+        "task_id": task_id,
+        "status": "queued",
+        "position": position,
+        "estimated_wait_seconds": estimated_wait
+    }
+
+@app.get("/api/v1/roast/{task_id}")
+async def get_task_status(task_id: str):
+    if task_id not in task_results:
+        raise HTTPException(status_code=404, detail="Task not found")
+    info = task_results[task_id]
+    response = {"task_id": task_id, "status": info["status"]}
+    if info["status"] == "done":
+        response.update(info["result"])
+    elif info["status"] == "error":
+        response["error"] = info.get("error", "Unknown error")
+    elif info["status"] == "queued":
+        response["position"] = info.get("position", "unknown")
+    return response

@@ -13,7 +13,6 @@ def get_connection():
 
 def init_db():
     with get_connection() as conn:
-        # Основная таблица отчётов
         conn.execute("""
             CREATE TABLE IF NOT EXISTS reports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,7 +23,6 @@ def init_db():
                 guide_snapshot TEXT
             )
         """)
-        # Добавляем новые колонки (если ещё не существуют)
         for col, col_type in [
             ("product_name", "TEXT"),
             ("journey_goal", "TEXT"),
@@ -38,7 +36,6 @@ def init_db():
             except sqlite3.OperationalError:
                 pass
 
-        # Таблица для быстрого поиска по критериям
         conn.execute("""
             CREATE TABLE IF NOT EXISTS criteria_history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,6 +50,17 @@ def init_db():
                 problem TEXT,
                 recommendation TEXT,
                 timestamp TEXT
+            )
+        """)
+
+        # Таблица для API-ключей
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS api_keys (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                key TEXT UNIQUE NOT NULL,
+                owner_name TEXT,
+                created_at TEXT NOT NULL,
+                active INTEGER DEFAULT 1
             )
         """)
         conn.commit()
@@ -78,7 +86,7 @@ def save_report(image_name: str, description: str, report_json: list | str,
         )
         report_id = cursor.lastrowid
 
-        # Заполняем таблицу критериев
+        # Заполняем criteria_history
         if isinstance(report_json, list):
             for item in report_json:
                 if isinstance(item, dict) and "критерий" in item:
@@ -149,7 +157,6 @@ def get_banks() -> list[str]:
         return [row[0] for row in rows]
 
 def find_best_for_criterion(criterion: str, bank: str = "", product: str = "", limit: int = 3):
-    """Ищет макеты с оценкой 2 по заданному критерию."""
     with get_connection() as conn:
         conditions = ["criterion = ?", "score = 2"]
         params = [criterion]
@@ -166,7 +173,6 @@ def find_best_for_criterion(criterion: str, bank: str = "", product: str = "", l
         return [dict(row) for row in rows]
 
 def get_knowledge_base():
-    """Возвращает дерево: банк -> продукт -> сценарий."""
     with get_connection() as conn:
         rows = conn.execute("""
             SELECT bank, product_name, scenario_slug, guide_name, timestamp, id
@@ -191,3 +197,32 @@ def get_knowledge_base():
             "timestamp": r["timestamp"]
         })
     return tree
+
+def validate_api_key(key: str) -> dict | None:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM api_keys WHERE key = ? AND active = 1",
+            (key,)
+        ).fetchone()
+        return dict(row) if row else None
+
+def add_api_key(key: str, owner_name: str) -> int:
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "INSERT INTO api_keys (key, owner_name, created_at) VALUES (?, ?, ?)",
+            (key, owner_name, datetime.now().isoformat())
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+def revoke_api_key(key: str):
+    with get_connection() as conn:
+        conn.execute("UPDATE api_keys SET active = 0 WHERE key = ?", (key,))
+        conn.commit()
+
+def list_api_keys():
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, key, owner_name, created_at, active FROM api_keys ORDER BY created_at DESC"
+        ).fetchall()
+        return [dict(row) for row in rows]
