@@ -11,9 +11,3 @@ source venv/bin/activate
 uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 
 http://localhost:8000
-
-
-
-
-figd_qlvWWXeAmxVlMNTlnaGLlgU1pOSOZz457nq-RFPy
-curl -H "X-Figma-Token: figd_qlvWWXeAmxVlMNTlnaGLlgU1pOSOZz457nq-RFPy" "https://api.figma.com/v1/files/wXLdwcIp4C3ceQT5xR7wfo?depth=1"
