@@ -3,12 +3,13 @@ services:
     build: .
     image: com-agent:latest
     ports:
-      - "${HOST_PORT:-8000}:8000"
+      # Слева — порт на сервере (8001, если 8000 занят cjxplorer-core). Справа — всегда 8000 внутри контейнера.
+      - "${HOST_PORT:-8001}:8000"
     env_file:
       - .env
     environment:
       DATA_DIR: /app/data
-      PORT: "8000"
+      PORT: "8000"  # не менять вместе с HOST_PORT
     volumes:
       # История прожарок, SQLite, референсы
       - com-agent-data:/app/data

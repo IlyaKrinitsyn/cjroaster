@@ -105,11 +105,41 @@ extra_hosts:
   - "host.docker.internal:host-gateway"
 ```
 
+## Порт 8000 занят (CJXplorer на том же сервере)
+
+Если `cjxplorer-core` уже слушает `0.0.0.0:8000`, **не останавливайте** его. В `.env` cjroaster:
+
+```env
+HOST_PORT=8001
+PORT=8000
+```
+
+В `docker-compose.yml` маппинг должен быть **`8001:8000`** (хост:контейнер), а не `8001:8001`:
+
+```yaml
+ports:
+  - "${HOST_PORT:-8001}:8000"
+environment:
+  PORT: "8000"
+```
+
+Ошибка: поменять `PORT=8001` внутри контейнера, но оставить проброс `8001:8000` — приложение не откроется.
+
+Перезапуск:
+
+```bash
+docker compose down
+docker compose up -d --build
+curl http://127.0.0.1:8001/
+```
+
+UI: `http://<сервер>:8001/`
+
 ## Обратный прокси (nginx)
 
 ```nginx
 location / {
-    proxy_pass http://127.0.0.1:8000;
+    proxy_pass http://127.0.0.1:8001;  # HOST_PORT cjroaster
     client_max_body_size 50M;
     proxy_read_timeout 600s;
 }
@@ -119,7 +149,7 @@ location / {
 
 ## Чеклист после деплоя
 
-1. `curl http://localhost:8000/` — HTML отвечает
-2. `curl http://localhost:8000/guides` — список гайдов
+1. `curl http://localhost:8001/` — HTML отвечает (или 8000, если HOST_PORT не меняли)
+2. `curl http://localhost:8001/guides` — список гайдов
 3. Прожарка 1 скриншота — нет ошибки `LLM_API_KEY`
 4. Том `/app/data` — появился `reports.db`
