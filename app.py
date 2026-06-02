@@ -1,5 +1,4 @@
 import streamlit as st
-from openai import OpenAI
 import os
 import sys
 import json
@@ -10,8 +9,8 @@ import pandas as pd
 from datetime import datetime
 from config import (
     MODEL_NAME, PROMPTS_DIR, GUIDES_DIR, REFERENCES_DIR, DESCRIPTION_MAX_TOKENS, ROAST_MAX_TOKENS,
-    HYPOTHESIS_MAX_TOKENS, API_TIMEOUT, MAX_STEPS, PATH_TYPE_TO_GUIDE, REQUIRED_FILES,
-    EXTRA_BODY, MOBBIN_API_KEY, MOBBIN_API_URL
+    HYPOTHESIS_MAX_TOKENS, MAX_STEPS, PATH_TYPE_TO_GUIDE, REQUIRED_FILES,
+    MOBBIN_API_KEY, MOBBIN_API_URL, client, _llm_extra_kwargs,
 )
 from database import init_db, save_report, load_reports, get_products, get_guide_names
 from dashboard import (
@@ -53,12 +52,7 @@ def load_guide(filename):
 # Инициализация клиента и БД
 # ---------------------------------------------
 check_required_files()
-
-client = OpenAI(
-    base_url="http://localhost:1234/v1",
-    api_key="lm-studio",
-    timeout=API_TIMEOUT
-)
+os.makedirs(REFERENCES_DIR, exist_ok=True)
 
 init_db()
 
@@ -135,7 +129,7 @@ def analyze_image_locally(image_data):
             ],
             temperature=0.0,
             max_tokens=DESCRIPTION_MAX_TOKENS,
-            extra_body=EXTRA_BODY
+            **_llm_extra_kwargs(),
         )
         content = response.choices[0].message.content.strip()
         if not content.endswith((".", "!", "?")):
@@ -163,7 +157,7 @@ def analyze_maket(description, guide_text, product, goal, criteria):
             temperature=0.0,
             max_tokens=ROAST_MAX_TOKENS,
             stop=None,
-            extra_body=EXTRA_BODY
+            **_llm_extra_kwargs(),
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
@@ -193,7 +187,7 @@ def generate_hypotheses(report_items, product, goal, criteria):
             ],
             temperature=0.0,
             max_tokens=HYPOTHESIS_MAX_TOKENS,
-            extra_body=EXTRA_BODY
+            **_llm_extra_kwargs(),
         )
         raw = response.choices[0].message.content.strip()
         hypotheses = parse_llm_json(raw)

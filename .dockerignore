@@ -1,0 +1,16 @@
+.git
+.gitignore
+venv/
+__pycache__/
+*.pyc
+.env
+*.db
+references/
+data/
+streamlit/
+app.py
+analyst.py
+test_ui.png
+figmatest.txt
+start.txt
+~$*

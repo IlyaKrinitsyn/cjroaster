@@ -2,9 +2,9 @@ import sqlite3
 import json
 from datetime import datetime
 from pathlib import Path
-from config import BASE_DIR
+from config import DATA_DIR
 
-DB_PATH = Path(BASE_DIR) / "reports.db"
+DB_PATH = Path(DATA_DIR) / "reports.db"
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)

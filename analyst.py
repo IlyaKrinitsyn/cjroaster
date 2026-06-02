@@ -1,16 +1,9 @@
-from openai import OpenAI
 import os
 import sys
 import json
 import base64
 
-# Клиент к локальному серверу LM Studio (тот же, что и раньше)
-client = OpenAI(
-    base_url="http://localhost:1234/v1",
-    api_key="lm-studio"
-)
-
-MODEL_NAME = "qwen3.6-27b"  # Имя модели в LM Studio
+from config import MODEL_NAME, client, _llm_extra_kwargs
 
 def analyze_image_locally(image_path: str) -> str:
     """
@@ -61,13 +54,11 @@ def analyze_image_locally(image_path: str) -> str:
             ],
             temperature=0.0,
             max_tokens=10000,
-            extra_body={
-                "reasoning": {"enabled": False}  # отключаем размышления
-            }
+            **_llm_extra_kwargs(),
         )
     except Exception as e:
         print(f"❌ Ошибка при обращении к модели: {e}")
-        print("   Проверьте, что сервер LM Studio запущен и модель загружена.")
+        print(f"   Проверьте LLM_API_KEY, LLM_BASE_URL и модель {MODEL_NAME!r}.")
         sys.exit(1)
 
     description = response.choices[0].message.content
@@ -107,7 +98,7 @@ def analyze_maket(description: str) -> str:
 
 Найди ровно 3 главных несоответствия гайду. Ответ строго в формате JSON-массива."""
 
-    print("⏳ Отправляю запрос в LM Studio...")
+    print("⏳ Отправляю запрос в LLM...")
 
     try:
         response = client.chat.completions.create(
@@ -119,9 +110,7 @@ def analyze_maket(description: str) -> str:
             temperature=0.0,
             max_tokens=10000,
             stop=None,
-            extra_body={
-                "reasoning": {"enabled": False}
-            }
+            **_llm_extra_kwargs(),
         )
     except Exception as e:
         print(f"❌ Ошибка при вызове API: {e}")

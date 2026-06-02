@@ -1,0 +1,18 @@
+services:
+  com-agent:
+    build: .
+    image: com-agent:latest
+    ports:
+      - "${HOST_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /app/data
+      PORT: "8000"
+    volumes:
+      # История прожарок, SQLite, референсы
+      - com-agent-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  com-agent-data:

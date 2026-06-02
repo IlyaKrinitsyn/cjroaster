@@ -16,10 +16,9 @@ from typing import Optional
 
 from config import (
     MODEL_NAME, PROMPTS_DIR, GUIDES_DIR, REFERENCES_DIR, DESCRIPTION_MAX_TOKENS, ROAST_MAX_TOKENS,
-    HYPOTHESIS_MAX_TOKENS, API_TIMEOUT, MAX_STEPS, PATH_TYPE_TO_GUIDE, REQUIRED_FILES,
-    EXTRA_BODY, MOBBIN_API_KEY, MOBBIN_API_URL
+    HYPOTHESIS_MAX_TOKENS, MAX_STEPS, PATH_TYPE_TO_GUIDE, REQUIRED_FILES,
+    MOBBIN_API_KEY, MOBBIN_API_URL, client, _llm_extra_kwargs, PORT,
 )
-from openai import OpenAI
 from database import (
     init_db, save_report, load_reports, get_products, get_guide_names,
     get_banks, find_best_for_criterion, get_knowledge_base, validate_api_key
@@ -36,8 +35,8 @@ FIGMA_ACCESS_TOKEN = os.getenv("FIGMA_ACCESS_TOKEN", "")
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-client = OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio", timeout=API_TIMEOUT)
 init_db()
+os.makedirs(REFERENCES_DIR, exist_ok=True)
 
 security = HTTPBearer()
 
@@ -155,7 +154,7 @@ def analyze_image(image_data):
         ],
         temperature=0.0,
         max_tokens=DESCRIPTION_MAX_TOKENS,
-        extra_body=EXTRA_BODY
+        **_llm_extra_kwargs(),
     )
     return response.choices[0].message.content.strip()
 
@@ -172,7 +171,7 @@ def analyze_maket(description, guide_text, product, goal, criteria):
         temperature=0.0,
         max_tokens=ROAST_MAX_TOKENS,
         stop=None,
-        extra_body=EXTRA_BODY
+        **_llm_extra_kwargs(),
     )
     return response.choices[0].message.content.strip()
 
@@ -194,7 +193,7 @@ def generate_hypotheses(report_items, product, goal, criteria):
         ],
         temperature=0.0,
         max_tokens=HYPOTHESIS_MAX_TOKENS,
-        extra_body=EXTRA_BODY
+        **_llm_extra_kwargs(),
     )
     raw = response.choices[0].message.content.strip()
     hypotheses = parse_llm_json(raw)
